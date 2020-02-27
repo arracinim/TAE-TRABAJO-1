@@ -1,0 +1,1405 @@
+---
+title: <center> $\bf{\text{Análisis de la calidad de vida en Medellín}}$ </center>
+author: <center> $\bf{\text{Jessica Quintero}^1 - \text{Valentina Yepes}^2}$ <br/> $\bf{\text{Ángel Racini}^3 - \text{Juan Betancur}^4 - \text{Yuberth Saavedra}^5}$ <br/> $\bf{\text{Técnicas en aprendizaje estadístico}}$ <br/> $\bf{\text{Universidad Nacional de Colombia - Sede Medellín}}$ </center>
+date: <center> $\bf{\text{26 de febrero de 2020}}$ </center>
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    code_folding: hide
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE,	warning=FALSE)
+
+## LIBRERÍAS O PAQUETES
+require(knitr)         ## Docs en Markdown
+library(kableExtra)    ## Datos en formato Markdown con función Kable()
+library(modeest)       ## Para calcular la moda.
+library(mice)          ## Imputar datos con la media, moda o mediana.
+library(tidyr)         ## Datos de formato ancho a largo (función spread)
+library(FactoClass)    ## Análisis factorial de los datos y un análisis de agrupamiento
+library(ggplot2)       ## Gráficos por capas
+library(plotrix)       ## 
+library(factoextra)    ## Extraer, visualizar la salida de análisis de datos multivariados
+library(NbClust)       ## Paquete para determinar la mejor cantidad de grupos
+library(cluster)       ## Métodos para el análisis de conglomerados
+library(dplyr)         ## Función filter()
+library(tools)         ## Función tolower()
+library(rgdal)         ## Mapa de calor
+library(leaflet)       ## Mapa de calor
+library(raster)        ## Mapa de calor
+```
+
+
+
+
+# Descripción del trabajo
+
+Teniendo en cuenta que la calidad de vida puede estar dada por diferentes factores y posiblemente muchos de ellos imposibles de controlar, el interés de  nuestro trabajo es clasificar todos los barrios de Medellín por grupos dadas ciertas dimensiones consideradas como las más relevantes; para este problema se parte de un análisis descriptivo y exploratorio para así tener un conocimiento clave sobre las variables que se tomaron en cuenta para el desarrollo del trabajo y así proceder a aplicar métodos de clasificación y estadísticos  vistos en el curso y que nos puedan orientar a determinar las semejanzas entre los barrios y la razón de estos agrupamientos ,finalmente se realizó un análisis tanto espacial como geográfico que nos permitiera mostrar las zonas más vulneradas y menos vulneradas respecto a cada dimensión. 
+
+
+
+
+# Motivación
+
+**Según la percepción ciudadana, ¿cómo es la calidad de vida en Medellín?**
+
+La calidad de vida es un conjunto de condiciones que contribuyen al bienestar de los individuos y a la realización de sus potencialidades en la vida social, se estudia la calidad de vida en Medellín ya que esta es una ciudad considerada como uno de los mejores destinos turísticos y ha sido destacada como la ciudad más innovadora del mundo en el año 2013, a pesar de que evidencia un alto grado de desigualdad social. No obstante, la calidad de vida es un tema amplio que puede ser analizado de diferentes formas, se analizan los siguientes temas de enfoque: *educación, transporte, seguridad, salud y demografía,* se consideran estos los más relevantes para la caracterización del progreso de una sociedad y así poder clasificar los barrios que presentan mayores problemas sociales en la ciudad de Medellín con el fin de dar posibles soluciones a estos.
+
+# Bases de datos {.tabset}
+
+Se lee la base de datos que contiene la información sobre la **Encuesta de Calidad de Vida en el municipio de Medellín.**
+
+```{r}
+ECVM <- read.csv2("encuesta_calidad_vida.csv", header=T, fileEncoding = "utf-8")
+dim(ECVM)
+```
+
+La **Encuesta de Calidad de Vida en el municipio de Medellín,** se realizó a 330574 personas (observaciones o filas) y tiene 369 preguntas (variables o columnas).
+
+Ahora se lee la base de datos con la información que describe las variables de la **Encuesta de Calidad de Vida en el municipio de Medellín.**
+
+```{r}
+Dicc_ECVM <- read.csv2("diccionario_calidad_vida.csv", header=T, fileEncoding="utf-8")
+dim(Dicc_ECVM)
+```
+
+El diccionario que describe las preguntas (variables) realizadas en la **Encuesta de Calidad de Vida en el municipio de Medellín,** tiene 4908 observaciones y 4 columnas.
+
+## Sub-bases por dimensión
+
+Por consiguiente, se seleccionan las sub-bases correspondientes a cada dimensión, así:
+
+```{r}
+Seguridad <- subset(ECVM, select=c("encuesta_calidad.p_283","encuesta_calidad.p_284",
+                                   "encuesta_calidad.p_288","encuesta_calidad.p_289"))
+names(Seguridad) <- c("Percepcion","Mayor_Problema","Confianza","Convivencia")
+```
+
+```{r}
+Salud <- subset(ECVM, select = c("encuesta_calidad.barrio","encuesta_calidad.p_66",
+                                 "encuesta_calidad.p_265","encuesta_calidad.p_342"))
+names(Salud) <- c("Barrio","Sin_afiliacion","Acceso_salud","Estado_salud")
+```
+
+```{r}
+Transporte <- subset(ECVM, select=c("encuesta_calidad.barrio","encuesta_calidad.p_241","encuesta_calidad.p_318",
+                                    "encuesta_calidad.p_319","encuesta_calidad.p_321",
+                                    "encuesta_calidad.p_322"))
+names(Transporte) <- c("Barrios","Costo","Calidad_Vias","Zona_Peatonal","Covertura","Calidad_Transporte")
+```
+
+```{r}
+Educacion <- subset(ECVM, select=c("encuesta_calidad.barrio","encuesta_calidad.p_35",
+                                   "encuesta_calidad.p_45","encuesta_calidad.p_49",
+                                   "encuesta_calidad.p_262","encuesta_calidad.p_264"))
+names(Educacion) <- c("Barrios","Analfabetismo","Nivel_Alcanzado","Caracter",
+                      "Percepcion_Calidad","Percepcion_Educacion")
+```
+
+```{r}
+Demografia <- subset(ECVM, select=c("encuesta_calidad.barrio","encuesta_calidad.p_310",
+                                    "encuesta_calidad.p_155","encuesta_calidad.p_12",
+                                    "encuesta_calidad.p_18"))
+names(Demografia) <- c("Barrio","Mortalidad_neonatal","Numero_cuartos","Personas_hogar","Edad")
+```
+
+## NAs Y NuLL
+
+No se tuvo en cuenta para el desarrollo del trabajo los datos que podian ser considerados como NULL para así obtener resultados más verídicos, por lo tanto procedemos a realizar el análisis de cada dimensión omitiendo estos valores, como se observa a continuación:
+
+# Análisis descriptivo {.tabset}
+
+Se realiza el análisis descriptivo para cada una de las dimensiones, así:
+
+## Seguridad {.tabset}
+
+### Resúmenes
+
+Se observa la estructura y el resumen descriptivo inicial de la sub-base correspondiente a la dimensión seguridad.
+
+```{r}
+str(Seguridad)
+```
+Se evidencia que todas la variables de esta dimensión toman valores enteros, lo que representa en este caso una representación numérica de cada nivel de las variables. En especial, se observa que la variable confianza toma valores negativos muy elevados en comparación con los demás entradas de las variables.
+```{r}
+summary(Seguridad)
+```
+
+Luego, se obtienen las estadísticas de resumen para cada una de las variables de la dimensión seguridad. Se observan las medias, medianas, valor mínimo y máximo de las variables y el primer, segundo y tercer cuantil.
+
+Note que, en este caso es inadecuado interpretar el promedio para cada variable, ya que los valores que pertenecen al rango de cada una de ellas no representan una medición, estos solo indican la categoría seleccionada por el encuestado.
+
+
+### Gráficos
+
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(1,2))
+Percepcion.Seg <- as.factor(Seguridad$Percepcion)
+x <- table(Percepcion.Seg)
+set.seed(1630)
+colores <- sample(2:9, replace=F, size=length(levels(Percepcion.Seg)))
+barplot(x, main="Percepción", las=1, col=colores, ylim=c(0,300000))
+text(x=c(0.7,1.9,3.1,4.3), y=c(30000,50000,270000,75000), labels=x, cex=0.8, col=1)
+legend("topleft", col=colores, lwd=2, bty="n", cex=0.7, 
+       legend=c("-98: No sabe","1: Muy seguro","2: Seguro","3: Inseguro"))
+
+Confianza.Seg <- as.factor(Seguridad$Confianza)
+x <- table(Confianza.Seg)
+set.seed(2020)
+colores <- sample(2:9, replace=F, size=length(levels(Confianza.Seg)))
+barplot(x, main="Confianza", las=1, col=colores, ylim=c(0,350000))
+text(x=c(0.7,1.9,3.1,4.3,5.5), y=c(30000,40000,320000,50000,60000), 
+     labels=x, cex=0.8, col=1)
+legend("topright", col=colores, lwd=2, bty="n", cex=0.5, 
+       legend=c("-99: No responde","-98: No sabe","-88: No aplica","1: Sí","2: No"))
+```
+El gráfico de barras para la variable percepción muestra que los resultados obtenidos en la encuesta de calidad de vida en Medellín, indican que las personas encuestadas en su gran mayoría, **248571** se sienten **seguros** en los barrios, veredas o corregimientos donde habitan. Únicamente se presentó **13**
+casos en los que las personas no sabían responder la pregunta.
+
+Por otro lado, del gráfico de barras para la variable confianza se sigue que aproximadamente, solo el *6 %* de los encuestados realizarón las demandas pertinentes ante las autoridades y entidades encargadas. Además, se encontró que aproximadamente el **90 %.** de los encuestados, no aplicaron para la pregunta.
+
+## Transporte {.tabset}
+
+### Resumenes
+
+Se observa la estructura y el resumen descriptivo inicial de la sub-base correspondiente a la dimensión transporte.
+
+```{r}
+str(Transporte)
+```
+
+```{r}
+summary(Transporte)
+```
+
+### Gráficos
+
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+o <- table(Transporte$Calidad_Vias)
+x <- barplot(o, main="Percepción calidad de las vias", xlab="Niveles de calidad", 
+             col= "cyan3", ylim = c(0,200000))
+text(x[,1],o,labels=o, pos=3,cex=0.75)
+
+a <- table(Transporte$Zona_Peatonal)
+i <- barplot(a,main = "Percepción calidad zonas peatonales",xlab= "Niveles de calidad", 
+             col= "darksalmon", ylim=c(0,200000))
+text(i[,1],a,labels=a, pos=3,cex=0.75)
+
+e <- table(Transporte$Covertura)
+f <- barplot(e,main = "Percepción covertura",xlab= "Niveles de calidad", 
+             col= "mediumorchid3",ylim=c(0,250000))
+text(f[,1],e,labels=e, pos=3,cex=0.70)
+
+ff <- table(Transporte$Calidad_Transporte)
+oo <- barplot(ff,main = "Percepción calidad ",xlab= "Niveles de calidad", 
+              col= "seagreen1", ylim=c(0,250000))
+text(oo[,1],ff,labels=ff, pos=3,cex=0.70)
+```
+
+De los siguientes gráficos podemos observar que para las cuatro variables analizadas(calidad vias, calidad zonas peatonales, cobertura en su barrio o comuna y calidad del transporte) con sus respectivos niveles de calidad( 1= muy malo,2= malo, 3=aceptable ,4 = bueno, 5= muy bueno),
+el valor con más frecuencia es 4 (bueno) para todas las variables analizadas, con esto podemos concluir que la percepción de las personas es que el transporte es bueno en la ciudad de Medellín.
+
+
+
+## Educación {.tabset}
+
+### Resúmenes
+
+Se observa la estructura y el resumen descriptivo inicial de la sub-base correspondiente a la dimensión educación.
+
+```{r}
+str(Educacion)
+```
+
+```{r}
+summary(Educacion)
+```
+
+### Gráficos
+
+```{r}
+
+counts1 <- table(Educacion$Analfabetismo)
+bar1 <- barplot(counts1, main="¿Sabe leer y escribir?", xlab="Respuesta", 
+                col=c("seagreen","purple"), border=c("seagreen","purple"), ylim=c(0,380000))
+colors <- c("seagreen","purple")
+respuestas <- c("Si","No")
+text(bar1,counts1, labels = counts1, pos=3, cex=0.7)
+```
+
+```{r}
+counts22 <- table(Educacion$Caracter)
+bar22 <- barplot(counts22, main="Caracter de la institución donde estudio", xlab="Respuesta", 
+                col=c("darkcyan","darkorchid4","hotpink4","olivedrab","salmon4"),
+                border=c("darkcyan","darkorchid4","hotpink4","olivedrab","salmon4"), ylim=c(0,347000))
+colors <- c("darkcyan","darkorchid4","hotpink4","olivedrab","salmon4")
+respuestas <- c("indefinido","indefinido","indefinido","Si","No")
+text(bar22,counts22, labels = counts22, pos=3, cex=0.75)
+```
+
+
++ Del gráfico anterior podemos ver que de 330574 encuestados 300131 que es una cifra significativa del total saben por lo menos leer y escribir un parrafo completo, indicando entre estos un bajo nivel de analfabetismo. 
+
++ Del gráfico de barras podemos ver que la mayoria de estudiantes o escolares, para este caso especificamente el 77.59715% son o fueron miembros de instituciones de caracter público, para este gráfico observamos que hay unas barras para los valores -99,-98,-88, significando que el usuario que se encuesto pudo no haber contestado, que la pregunta fue anulada, entre otras cosas. 
+
+
+```{r}
+
+counts2 <- table(Educacion$Percepcion_Calidad)
+bar2 <- barplot(counts2, main="Percepción de la calidad de la educación por corregimiento",
+                xlab="Niveles de percepción", 
+                col = c("seagreen1","mediumslateblue","lightseagreen",
+                        "palevioletred2","yellowgreen"),
+                border = c("seagreen1","mediumslateblue","lightseagreen",
+                           "palevioletred2","yellowgreen"), ylim=c(0,180000))
+respuestas <- c("Indefinido","Indefinido","Mejorado","Igual","Empeorado")
+text(bar2, counts2, labels=counts2, pos=3, cex=0.75)
+
+```
+
+```{r}
+counts3 <- table(Educacion$Percepcion_Educacion)
+bar3 <- barplot(counts3, main="Percepción de la calidad de la educación por municipio",
+                xlab="Niveles de percepción", 
+                col=c("seagreen1","mediumslateblue","lightseagreen",
+                      "palevioletred2","yellowgreen"),
+                border=c("seagreen1","mediumslateblue","lightseagreen",
+                           "palevioletred2","yellowgreen"), ylim=c(0,200000))
+respuestas <- c("Indefinido","Indefinido","Mejorado","Igual","Empeorado")
+text(bar3,counts3, labels = counts3, pos=3, cex=0.75)
+```
+
+
+Para los siguientes gráficos tengamos en cuenta que:
+
++ 1 significa que el nivel educativo ha mejorado.
++ 2 significa que el nivel educativo ha permanecido igual. 
++ 3 significa que el nivel educativo ha empeorado. 
++ -99,-98 indefinido, pregunta anulada, no contestada, entre otras.
+
+
+Del gráfico anterior podemos observar que la percepción de las personas con respecto al nivel educativo de las intituciones pertenecientes a su respectivo corregimiento y municipio en su mayoria piensan que este ha mejorado, dado que de las 330574 personas encuestadas 129038 piensan que esta ha tenido una evolución positiva por corregimiento y 135467 personas piensan lo mismo por municipio. 
+
+
+## Salud {.tabset}
+
+### Resúmenes
+
+Se observa la estructura y el resumen descriptivo inicial de la sub-base correspondiente a la dimensión salud.
+
+```{r}
+str(Salud)
+```
+
+```{r}
+summary(Salud)
+```
+
++ En la base se puede observar que para la variable sin_afiliacion y estado_salud hay respuestas negativas que podrían indicar algún tipo de respuesta que posiblemente no sea de interés para el estudio que queremos realizar, por lo tanto deberian filtrarse.
+
++ La variable estado salud presenta 145.693 valores nulos que se eliminarán de la base de datos
+
+### Gráficos
+
+```{r message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+ggplot(Salud, aes(Sin_afiliacion)) + 
+  geom_bar(fill="turquoise4") + 
+  ggtitle("Grafico de barras: Sin Afiliacion") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+ggplot(data = Salud, aes(Estado_salud)) + geom_bar(fill="violetred4") + xlab("Estado Salud") + 
+  ggtitle("Graficos de Barras de la variable: estado de salud") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+De la gráfica podemos notar que la gran mayoría de personas esta afiliada a un sistema
+de seguridad social ya sea como cotizante o subsidiado. Se observan datos negativos
+correspondientes a respuestas no sabe/no responde que se filtraran posteriormente. 
+
+Del gráfico podemos notar que el estado de salud promedio de las personas es bueno. 
+
+
+## Demografía {.tabset}
+
+### Resumenes
+
+Se observa la estructura y el resumen descriptivo inicial de la sub-base correspondiente a la dimensión demográfica.
+
+```{r}
+str(Demografia)
+```
+
+```{r}
+summary(Demografia)
+```
+
++ En la base se puede observar que para la variable mortalidad neonatal hay respuestas negativas que podrían indicar algún tipo de respuesta que posiblemente no sea de interés para el estudio que queremos realizar, por lo tanto deberian filtrarse.
+
++ Las demas variables presentan valores razonables, por lo que aparentemente no deberían aplicarse algún tipo de filtro. 
+
+### Gráficos
+
+
+```{r}
+ggplot(Demografia, aes(Numero_cuartos)) + geom_bar(fill="salmon") + xlab("Numero Cuartos") + 
+  ggtitle("Gráficos de Barras de la variable: Numero de Cuartos") + theme(plot.title = element_text(hjust = 0.5))
+```
+
++ Del grafico podemos notar que la gran mayoria de casas en la ciudad tienen en promedio de 2 a 3 habitaciones exclusivamente para dormir.
+
+```{r}
+ggplot(Demografia, aes(Personas_hogar)) + geom_bar(fill="turquoise4") + xlab("Personas hogar") + 
+  ggtitle("Graficos de Barras de la variable: Personas Hogar") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
++ Del gráfico podemos notar que en promedio en la ciudad viven, entre 3 a 5 a personas por vivienda.
+
+
+En cuanto a la edad, podriamos notar que gran parte de la poblacion está entre los 15 y los 30 años y entre los 40 y 60 años. 
+
+
+# Limpieza de los datos {.tabset}
+
+## Seguridad
+
+En el análisis descriptivo anterior, se evidencian algunos valores negativos en las variables **(-99, -98, -88 y -77),** estos se convierten en **NA's** para posteriormente imputarlos.
+
+Se convierten las variables en un factor y se cambian los valores negativos por **NA's.**
+
+```{r}
+Percepcion.Seg <- factor(Seguridad$Percepcion, levels=c("NA","1","2","3"))
+Mayor.Prob.Seg <- factor(Seguridad$Mayor_Problema, levels=c("NA","1","2","3","4","5","6","7",
+                                                            "8","9","10","11","12","13","14"))
+Confianza.Seg <- factor(Seguridad$Confianza, levels=c("NA","1","2"))
+Convivencia.Seg <- factor(Seguridad$Convivencia,levels=c("NA","1","2","3","4","5","6",
+                                                         "7","8","9","10","11","12"))
+Seguridad <- data.frame(Percepcion.Seg, Mayor.Prob.Seg, Confianza.Seg, Convivencia.Seg)
+```
+
+Se obtienen las modas de las variables, omitiendo los NA's.
+
+```{r}
+mfv(na.omit(Seguridad$Percepcion.Seg))
+```
+
+```{r}
+mfv(na.omit(Seguridad$Mayor.Prob.Seg))
+```
+
+```{r}
+mfv(na.omit(Seguridad$Confianza.Seg))
+```
+
+```{r}
+mfv(na.omit(Seguridad$Convivencia.Seg))
+```
+
+Luego, se reemplazan las modas correspondientes a los valores NA's de cada una de las variables. Observe que ya no se tienen valores NA's en las variables de la dimensión seguridad.
+
+
+```{r}
+getmode <- function(v){
+  library(modeest)
+  mfv(na.omit(v))
+}
+z1 <- which(Seguridad$Percepcion.Seg != "NA")
+Seguridad$Percepcion.Seg[-z1] <- getmode(Seguridad$Percepcion.Seg)
+z2 <- which(Seguridad$Mayor.Prob.Seg != "NA")
+Seguridad$Mayor.Prob.Seg[-z2] <- getmode(Seguridad$Mayor.Prob.Seg)
+z3 <- which(Seguridad$Confianza.Seg != "NA")
+Seguridad$Confianza.Seg[-z3] <- getmode(Seguridad$Confianza.Seg)
+z4 <- which(Seguridad$Convivencia.Seg != "NA")
+Seguridad$Convivencia.Seg[-z4] <- getmode(Seguridad$Convivencia.Seg)
+```
+
+```{r}
+colSums(is.na(Seguridad))
+```
+
+## Salud
+
+Los valores negativos se imputan mediante la moda, que en este caso es 3 para la variable **Estado_Salud.**
+
+```{r}
+Salud$Estado_salud[Salud$Estado_salud == "NULL"] <- getmode(Salud$Estado_salud)
+```
+
+## Demografía
+
+En el análisis descriptivo se evidencian algunos valores negativos en las variables **(-99, -98, -88 y -77),** estos se convierten en **NA's** para posteriormente imputarlos.
+
+Se convierten las variables en un factor y se cambian los valores negativos por **NA's.**
+
+
+```{r}
+colSums(is.na(Demografia))
+```
+
+# Proporciones por barrios {.tabset}
+
+A continuación, se obtienen las proporciones de cada nivel de las variables en los barrios, veredas o corregimientos del municipio de Medellín para cada dimensión.
+
+## Seguridad
+
+```{r}
+Barrios <- ECVM$encuesta_calidad.barrio
+
+Percepcion.Seg <- factor(Seguridad$Percepcion.Seg, levels=c(1:3))
+Percepcion.Seg <- data.frame(Barrios, Percepcion.Seg)
+Prop.1 <- table(Percepcion.Seg) / apply(table(Percepcion.Seg), 1, sum)
+colnames(Prop.1) <- c("1:Muy.Seguro","2:Seguro","3:Inseguro")
+Prop.1 <- as.data.frame(Prop.1)
+Prop.1 <- spread(Prop.1, key=Percepcion.Seg, value=Freq)
+
+Mayor.Prob.Seg <- factor(Seguridad$Mayor.Prob.Seg, levels=c(1:14))
+Mayor.Prob.Seg <- data.frame(Barrios, Mayor.Prob.Seg)
+Prop.2 <- table(Mayor.Prob.Seg) / apply(table(Mayor.Prob.Seg), 1, sum)
+colnames(Prop.2) <- c("1","2","3","4","5","6","7","8","9","10","11","12","13","14")
+Prop.2 <- as.data.frame(Prop.2)
+Prop.2 <- spread(Prop.2, key=Mayor.Prob.Seg, value=Freq)
+
+Confianza.Seg <- factor(Seguridad$Confianza.Seg, levels=c(1:2))
+Confianza.Seg <- data.frame(Barrios, Confianza.Seg)
+Prop.3 <- table(Confianza.Seg) / apply(table(Confianza.Seg), 1, sum)
+colnames(Prop.3) <- c("1:Sí","2:No")
+Prop.3 <- as.data.frame(Prop.3)
+Prop.3 <- spread(Prop.3, key=Confianza.Seg, value=Freq)
+
+Convivencia.Seg <- factor(Seguridad$Convivencia.Seg, levels=c(1:12))
+Convivencia.Seg <- data.frame(Barrios, Convivencia.Seg)
+Prop.4 <- table(Convivencia.Seg) / apply(table(Convivencia.Seg), 1, sum)
+colnames(Prop.4) <- c("1","2","3","4","5","6","7","8","9","10","11","12")
+Prop.4 <- as.data.frame(Prop.4)
+Prop.4 <- spread(Prop.4, key=Convivencia.Seg, value=Freq)
+```
+
+```{r}
+Prop.Fin <- data.frame(Prop.1, Prop.2[,-1], Prop.3[,-1], Prop.4[,-1])
+names(Prop.Fin) <- c("Barrios","1.1","1.2","1.3","2.1","2.2","2.3","2.4","2.5","2.6","2.7",
+                     "2.8","2.9","2.10","2.11","2.12","2.13","2.14","3.1","3.2","4.1","4.2",
+                     "4.3","4.4","4.5","4.6","4.7","4.8","4.9","4.10","4.11","4.12")
+rownames(Prop.Fin) <- Prop.Fin$`Barrios`
+Prop.Fin <- Prop.Fin[,-1]
+head(Prop.Fin, 3)
+```
+
+## Transporte
+```{r}
+cali <- split(Transporte$Calidad_Vias,Transporte$Barrios)
+fun <- function(x){
+  porce1 <- round(sum(x=="1")/length(x),4)
+  porce2 <- round(sum(x=="2")/length(x),4)
+  porce3 <- round(sum(x=="3")/length(x),4)
+  porce4 <- round(sum(x=="4")/length(x),4)
+  porce5 <- round(sum(x=="5")/length(x),4)
+  porcef <- c(porce1,porce2,porce3,porce4,porce5)
+  return(porcef)
+}
+w <- lapply(cali, fun)
+ww <- t(data.frame(w))
+
+cali1 <- split(Transporte$Zona_Peatonal,Transporte$Barrios)
+
+fun <- function(x){
+  porce1 <- round(sum(x=="1")/length(x),4)
+  porce2 <- round(sum(x=="2")/length(x),4)
+  porce3 <- round(sum(x=="3")/length(x),4)
+  porce4 <- round(sum(x=="4")/length(x),4)
+  porce5 <- round(sum(x=="5")/length(x),4)
+  porcef <- c(porce1,porce2,porce3,porce4,porce5)
+  return(porcef)
+}
+w1 <- lapply(cali1, fun)
+ww1 <- t(data.frame(w1))
+
+cali2 <- split(Transporte$Covertura,Transporte$Barrios)
+
+fun <- function(x){
+  porce1 <- round(sum(x=="1")/length(x),4)
+  porce2 <- round(sum(x=="2")/length(x),4)
+  porce3 <- round(sum(x=="3")/length(x),4)
+  porce4 <- round(sum(x=="4")/length(x),4)
+  porce5 <- round(sum(x=="5")/length(x),4)
+  porcef <- c(porce1,porce2,porce3,porce4,porce5)
+  return(porcef)
+}
+w2 <- lapply(cali2, fun)
+ww2 <- t(data.frame(w2))
+
+cali3 <- split(Transporte$Calidad_Transporte,Transporte$Barrios)
+fun <- function(x){
+  porce1 <- round(sum(x=="1")/length(x),4)
+  porce2 <- round(sum(x=="2")/length(x),4)
+  porce3 <- round(sum(x=="3")/length(x),4)
+  porce4 <- round(sum(x=="4")/length(x),4)
+  porce5 <- round(sum(x=="5")/length(x),4)
+  porcef <- c(porce1,porce2,porce3,porce4,porce5)
+  return(porcef)
+}
+w3 <- lapply(cali3, fun)
+ww3 <- t(data.frame(w3))
+
+f <- data.frame(ww,ww1,ww2,ww3)
+
+library(dplyr)
+Transporte1 <- filter(Transporte, Costo!="-99")
+Transporte2 <- filter(Transporte1, Costo!="-98")
+
+cali4 <- split(Transporte2$Costo,Transporte$Barrios)
+fun2 <- function(x){
+  p <- median(x)
+ 
+ 
+  return(p)
+}
+w4 <- lapply(cali4, fun2)
+ww4 <- t(data.frame(w4))
+Transporte <- data.frame(ww4,f)
+
+names(Transporte)<- c("cantidad promedio","Proporcion calidad vias muy malas",
+                       "Proporcion calidad vias malas","Proporcion calidad vias aceptables","Proporcion calidad vias buenas","Proporcion calidad vias muy buenas","Proporcion calidad zonasp muy malas",
+                       "Proporcion calidad zonasp malas","Proporcion calidad zonasp aceptables","Proporcion calidad zonasp buenas","Proporcion calidad zonasp muy buenas","Proporcion covertura muy mala",
+                       "Proporcion covertura mala","Proporcion covertura aceptable","Proporcion covertura buena","Proporcion covertura muy buena","Proporcion calidad muy mala",
+                       "Proporcion calidad mala","Proporcion calidad aceptable","Proporcion calidad buena","Proporcion calidad muy buena")
+head(Transporte, 3)
+
+```
+
+
+## Educación
+
+```{r message=FALSE, warning=FALSE}
+fun1.jess <- function(x){
+         prop1 <- sum(x == "1")/(length(x))
+         prop2 <- sum(x == "2")/(length(x))
+         propf <- c(prop1, prop2)
+         return(propf)}
+
+fun2.jess <- function(x){
+        prop0 <- sum(x == "0")/(length(x))
+        prop1 <- sum(x == "1")/(length(x))
+        prop2 <- sum(x == "2")/(length(x))
+        prop3 <- sum(x == "3")/(length(x))
+        prop4 <- sum(x == "4")/(length(x))
+        prop5 <- sum(x == "5")/(length(x))
+        prop6 <- sum(x == "6")/(length(x))
+        prop7 <- sum(x == "7")/(length(x))
+        prop8 <- sum(x == "8")/(length(x))
+        prop9 <- sum(x == "9")/(length(x))
+        prop10 <- sum(x == "10")/(length(x))
+        propf <- c(prop0, prop1, prop2, prop3, prop4, prop5,
+                   prop6, prop7, prop8, prop9, prop10)
+        return(propf)}
+
+fun3.jess <- function(x){
+        prop1 <- sum(x == "1")/(length(x))
+        prop2 <- sum(x == "2")/(length(x))
+        propf <- c(prop1, prop2)
+        return(propf)}
+
+fun4.jess <- function(x){
+        prop1 <- sum(x == "1")/(length(x))
+        prop2 <- sum(x == "2")/(length(x))
+        prop3 <- sum(x == "3")/(length(x))
+        propf <- c(prop1, prop2, prop3)
+        return(propf)}
+
+fun5.jess <- function(x){
+        prop1 <- sum(x == "1")/(length(x))
+        prop2 <-  sum(x == "2")/(length(x))
+        prop3 <-  sum(x == "3")/(length(x))
+        propf <- c(prop1, prop2, prop3)
+        return(propf)}
+```
+
+```{r}
+caracter00 <- filter(Educacion, Analfabetismo!=-99)
+caracter000 <- filter(caracter00, Analfabetismo!=-98)
+caracter0000 <- filter(caracter000, Analfabetismo!=-88)
+bases_analfabetismo <- split(caracter0000$Analfabetismo, caracter0000$Barrios)
+
+nivel_alcanzado2 <- filter(Educacion, Nivel_Alcanzado!=-99)
+nivel_alcanzado3 <- filter(nivel_alcanzado2, Nivel_Alcanzado!=-98)
+base_nivel_alcanzado <- split(nivel_alcanzado3$Nivel_Alcanzado, nivel_alcanzado3$Barrios)
+
+caracter2 <- filter(Educacion, Caracter!=-99)
+caracter3 <- filter(caracter2, Caracter!=-98)
+caracter4 <- filter(caracter3, Caracter!=-88)
+base_caracter <- split(caracter4$Caracter, caracter4$Barrios)
+
+percep3 <- filter(Educacion, Percepcion_Calidad!=-99)
+percep4 <- filter(percep3, Percepcion_Calidad!=-98)
+percep5 <- filter(percep4, Percepcion_Calidad!=-88)
+base_percepcion_calidad <- split(percep5$Percepcion_Calidad, percep5$Barrios)
+
+percep6 <- filter(Educacion, Percepcion_Educacion!=-99)
+percep7 <- filter(percep6, Percepcion_Educacion!=-98)
+percep8 <- filter(percep7, Percepcion_Educacion!=-88)
+base_percepcion_educacion <- split(percep8$Percepcion_Educacion, percep8$Barrios)
+```
+
+```{r}
+lista_analf <- lapply(bases_analfabetismo, FUN=fun1.jess)
+lista_analfabetismo <- as.data.frame(t(as.data.frame(lista_analf)))
+names(lista_analfabetismo) <- c("no_analfabeta","analfabeta")
+
+lista_nivel_alca <- lapply(base_nivel_alcanzado, FUN=fun2.jess)
+lista_nivel_alcanzado <- as.data.frame(t(as.data.frame(lista_nivel_alca)))
+names(lista_nivel_alcanzado) <- c("ninguno","sala_cuna","primaria","secundaria",
+                                  "media_academica","media","tecnologo","universitario",
+                                  "especializacion","maestria","doctorado")
+
+lista_carac <- lapply(base_caracter, FUN=fun3.jess)
+lista_caracter <- as.data.frame(t(as.data.frame(lista_carac)))
+names(lista_caracter) <- c("publico","privado")
+
+lista_percepcion_cal <- lapply(base_percepcion_calidad, FUN=fun4.jess)
+lista_percepcion_calidad <- as.data.frame(t(as.data.frame(lista_percepcion_cal)))
+names(lista_percepcion_calidad) <- c("mejorado","igual","empeoro")
+
+lista_percepcion_edu <- lapply(base_percepcion_educacion, FUN=fun5.jess)
+lista_percepcion_educacion <- as.data.frame(t(as.data.frame(lista_percepcion_edu)))
+names(lista_percepcion_educacion) <-  c("mejorado_e","igual_e","empeoro_e")
+
+EDUCACIONF <- data.frame(lista_analfabetismo, lista_caracter, lista_nivel_alcanzado,
+                        lista_percepcion_calidad,lista_percepcion_educacion)
+head(EDUCACIONF, 3)
+```
+
+## Salud
+
+```{r}
+fun1.salud <- function(x){
+        porcentaje <- sum(x == 7)/(length(x))
+        return(porcentaje)}
+
+fun2.salud <- function(x){
+        promedio <- sum(x == "1" | x == "2")/(length(x))
+        porcentajef <- c(promedio)
+        return(porcentajef)}
+
+fun3.salud <- function(x){
+        promedio <- sum(x == "1" | x == "2")/(length(x))
+        porcentajef <- c(promedio)
+        return(porcentajef)}
+```
+
+```{r}
+base_sinafiliacion <- filter(Salud, Sin_afiliacion >= 0)
+base_sinafiliacion <- split(base_sinafiliacion$Sin_afiliacion, base_sinafiliacion$Barrio)
+
+base_accesosalud <- filter(Salud, Acceso_salud >= 0)
+base_accesosalud <- split(base_accesosalud$Acceso_salud, base_accesosalud$Barrio)
+
+base_estadosalud <- filter(Salud, Estado_salud != "-98")
+base_estadosalud <- filter(base_estadosalud, Estado_salud != "-99")
+base_estadosalud <- split(base_estadosalud$Estado_salud, base_estadosalud$Barrio)
+
+lista_sinafiliacion <- lapply(base_sinafiliacion, FUN=fun1.salud)
+lista_sinafiliacion <- as.data.frame(t(as.data.frame(lista_sinafiliacion)))
+names(lista_sinafiliacion) <- c("sin_afiliacion")
+
+lista_accesosalud <- lapply(base_accesosalud, FUN=fun2.salud)
+lista_accesosalud <- as.data.frame(t(as.data.frame(lista_accesosalud)))
+names(lista_accesosalud) <- c("acceso_salud")
+
+base_estadosalud <- lapply(base_estadosalud, FUN=fun3.salud)
+lista_estadosalud <- as.data.frame(t(as.data.frame(base_estadosalud)))
+names(lista_estadosalud) <-  c("estado_salud")
+
+Salud_df <- data.frame(lista_sinafiliacion, lista_accesosalud, lista_estadosalud)
+head(Salud_df, 3)
+```
+
+
+## Demografía
+
+```{r}
+base_mortalidad <- filter(Demografia, Mortalidad_neonatal >= 0)
+base_mortalidad <- split(base_mortalidad$Mortalidad_neonatal, base_mortalidad$Barrio)
+
+f <- function(x){
+        porcentaje <- sum(x)/(length(x))
+        return(porcentaje)
+}
+
+lista_mortalidad <- lapply(base_mortalidad, FUN = f)
+lista_mortalidad <- as.data.frame(t(as.data.frame(lista_mortalidad)))
+names(lista_mortalidad) <- c('mortalidad_neonatal')
+base_hacinamiento <- filter(Demografia, Numero_cuartos >= 0)
+base_hacinamiento <-  filter(Demografia, Personas_hogar >= 0)
+
+base_hacinamiento$hacinamiento <- base_hacinamiento$Numero_cuartos / base_hacinamiento$Personas_hogar
+
+base_hacinamiento <- split(base_hacinamiento$hacinamiento, Demografia$Barrio)
+
+f <- function(x){
+        hacinamiento <- sum(x)/(length(x))
+        porcentajef <- c(hacinamiento)
+        return(porcentajef)
+        
+}
+lista_hacinamiento <- lapply(base_hacinamiento, FUN = f)
+lista_hacinamiento <- as.data.frame(t(as.data.frame(lista_hacinamiento)))
+names(lista_hacinamiento) <-  c("hacinamiento")
+base_abuso <- filter(Demografia, Numero_cuartos >= 0)
+base_abuso <-  filter(base_abuso, Personas_hogar >= 0)
+base_abuso <- filter(base_abuso, Edad < 18)
+
+base_abuso$abuso= 1 - base_abuso$Numero_cuartos / base_abuso$Personas_hogar
+
+
+base_abuso <- split(base_abuso$abuso, base_abuso$Barrio)
+
+f <- function(x){
+        promedio <-  sum(x)/(length(x))
+        return(promedio)
+}
+
+lista_abuso <- lapply(base_abuso, FUN = f)
+lista_abuso <- as.data.frame(t(as.data.frame(lista_abuso)))
+names(lista_abuso) <-  c("abuso_sexual")
+```
+
+
+```{r}
+demografia_df <- data.frame(lista_mortalidad, lista_hacinamiento, lista_abuso)
+
+demografia_df[is.na(demografia_df$abuso_sexual), "abuso_sexual"] <- mean(demografia_df$abuso_sexual, na.rm=T)
+
+demografia_df[is.na(demografia_df$mortalidad_neonatal), "mortalidad_neonatal"] <- mean(demografia_df$mortalidad_neonatal, na.rm=T)
+
+head(demografia_df, 3)
+```
+
+
+# K - Óptimo de grupos {.tabset}
+
+Se utilizarón los criterios silhouette, wss, gap_stat para tener una idea del k-optimo, en cada dimensión se encontraron diferentes rangos para k , luego se evaluaron todos los posibles valores de k dentro del rango para así obtener un k definitivo.
+
++ Para la dimensión Educacion se obtuvo un k=6.
++ Para la dimensión Transporte se obtuvo un k=7.
++ Para la dimensión Seguridad se obtuvo un k=4
++ Para la dimensión Salud se obtuvo un k=6
++ Para la dimensión Demografia se obtuvo un k=5
+
+
+# Agrupación por K-Means {.tabset}
+
+## Seguridad
+
+```{r out.height=5,out.width=5}
+set.seed(2020)
+Prop.Scale <- scale(Prop.Fin, center=TRUE, scale=TRUE)
+km.res <- kmeans(Prop.Scale, centers=4, nstart=10)
+g1 <- cbind(Prop.Fin, cluster=km.res$cluster)
+Barrios <- levels(Prop.1$Barrios)
+g1 <- data.frame(Barrios, g1)
+rownames(g1) = 1:nrow(g1)
+g1 <- g1[-c(47,64,273),]
+fviz_cluster(km.res, Prop.Scale)
+```
+
+## Transporte
+
+```{r out.height=5,out.width=5}
+set.seed(123)
+Trans.Scale <- scale(Transporte)
+km.res <- kmeans(Trans.Scale, centers=7, iter.max = 10)
+g2 <- cbind(Transporte, cluster=km.res$cluster)
+g2 <- data.frame(Barrios, g2)
+rownames(g2) = 1:nrow(g2)
+g2 <- g2[-c(47,64,273),]
+fviz_cluster(km.res, Trans.Scale)
+```
+
+## Educación
+
+```{r out.height=5,out.width=5}
+set.seed(123)
+EDUCACIONF_scale <- scale(EDUCACIONF, center=TRUE, scale=TRUE)
+km.res <- kmeans(EDUCACIONF_scale, 6)
+g3 <- cbind(EDUCACIONF, cluster=km.res$cluster)
+g3 <- data.frame(Barrios, g3)
+rownames(g3) = 1:nrow(g3)
+g3 <- g3[-c(47,64,273),]
+fviz_cluster(km.res, EDUCACIONF_scale)
+```
+
+## Salud
+
+```{r out.height=5,out.width=5}
+set.seed(123)
+Salud_scale <- scale(Salud_df, center=TRUE, scale=TRUE)
+km.res <- kmeans(Salud_scale, 6)
+g4 <- cbind(Salud_df, cluster=km.res$cluster)
+g4 <- data.frame(levels(Salud$Barrio), g4)
+rownames(g4) = 1:nrow(g4)
+g4 <- g4[-c(47,64,273),]
+fviz_cluster(km.res, Salud_scale)
+```
+
+## Demografía
+
+```{r out.height=10,out.width=10}
+set.seed(123)
+Demo_scale <- scale(demografia_df)
+km.res <- kmeans(Demo_scale, centers = 5,nstart = 25)
+g5 <- cbind(demografia_df, cluster=km.res$cluster)
+Barrios <- levels(Demografia$Barrio)
+g5 <- data.frame(Barrios, g5)
+rownames(g5) = 1:nrow(g5)
+g5 <- g5[-c(47,64,273),]
+fviz_cluster(km.res, Demo_scale)
+```
+
+
+# Clasificando las observaciones en cada grupo {.tabset}
+
+## Seguridad
+
+```{r}
+G1.1 <- filter(g1, g1$cluster=="1")
+G2.1 <- filter(g1, g1$cluster=="2")
+G3.1 <- filter(g1, g1$cluster=="3")
+G4.1 <- filter(g1, g1$cluster=="4")
+```
+
+## Transporte
+
+```{r}
+G1.2 <- filter(g2, g2$cluster=="1")
+G2.2 <- filter(g2, g2$cluster=="2")
+G3.2 <- filter(g2, g2$cluster=="3")
+G4.2 <- filter(g2, g2$cluster=="4")
+G5.2 <- filter(g2, g2$cluster=="5")
+G6.2 <- filter(g2, g2$cluster=="6")
+G7.2 <- filter(g2, g2$cluster=="7")
+```
+
+## Educación
+
+```{r}
+G1.3 <- filter(g3, g3$cluster=="1")
+G2.3 <- filter(g3, g3$cluster=="2")
+G3.3 <- filter(g3, g3$cluster=="3")
+G4.3 <- filter(g3, g3$cluster=="4")
+G5.3 <- filter(g3, g3$cluster=="5")
+G6.3 <- filter(g3, g3$cluster=="6")
+```
+
+## Salud
+
+```{r}
+G1.4 <- filter(g4, g4$cluster=="1")
+G2.4 <- filter(g4, g4$cluster=="2")
+G3.4 <- filter(g4, g4$cluster=="3")
+G4.4 <- filter(g4, g4$cluster=="4")
+G5.4 <- filter(g4, g4$cluster=="5")
+G6.4 <- filter(g4, g4$cluster=="6")
+```
+
+
+## Demografía
+
+```{r}
+G1.5 <- filter(g5, g5$cluster=="1")
+G2.5 <- filter(g5, g5$cluster=="2")
+G3.5 <- filter(g5, g5$cluster=="3")
+G4.5 <- filter(g5, g5$cluster=="4")
+G5.5 <- filter(g5, g5$cluster=="5")
+```
+
+# Ordenando los colores de los grupos {.tabset}
+
+## Seguridad
+
+```{r}
+C1 <- rep("orange", nrow(G1.1))
+Grupo1.1 <- cbind(G1.1, C1)
+C1 <- rep("green", nrow(G2.1))
+Grupo2.1 <- cbind(G2.1, C1)
+C1 <- rep("red", nrow(G3.1))
+Grupo3.1 <- cbind(G3.1, C1)
+C1 <- rep("yellow", nrow(G4.1))
+Grupo4.1 <- cbind(G4.1, C1)
+```
+
+
+## Transporte
+
+```{r}
+C2 <- rep("chartreuse", nrow(G1.2))
+Grupo1.2 <- cbind(G1.2, C2)
+C2 <- rep("red", nrow(G2.2))
+Grupo2.2 <- cbind(G2.2, C2)
+C2 <- rep("orange", nrow(G3.2))
+Grupo3.2 <- cbind(G3.2, C2)
+C2 <- rep("green", nrow(G4.2))
+Grupo4.2 <- cbind(G4.2, C2)
+C2 <- rep("darkorange", nrow(G5.2))
+Grupo5.2 <- cbind(G5.2, C2)
+C2 <- rep("greenyellow", nrow(G6.2))
+Grupo6.2 <- cbind(G6.2, C2)
+C2 <- rep("orangered", nrow(G7.2))
+Grupo7.2 <- cbind(G7.2, C2)
+```
+
+## Educación
+
+```{r}
+C3 <- rep("greenyellow", nrow(G1.3))
+Grupo1.3 <- cbind(G1.3, C3)
+C3 <- rep("orangered", nrow(G2.3))
+Grupo2.3 <- cbind(G2.3, C3)
+C3 <- rep("red", nrow(G3.3))
+Grupo3.3 <- cbind(G3.3, C3)
+C3 <- rep("chartreuse", nrow(G4.3))
+Grupo4.3 <- cbind(G4.3, C3)
+C3 <- rep("orange", nrow(G5.3))
+Grupo5.3 <- cbind(G5.3, C3)
+C3 <- rep("green", nrow(G6.3))
+Grupo6.3 <- cbind(G6.3, C3)
+```
+
+## Salud
+
+```{r}
+C4 <- rep("green", nrow(G1.4))
+Grupo1.4 <- cbind(G1.4, C4)
+C4 <- rep("greenyellow", nrow(G2.4))
+Grupo2.4 <- cbind(G2.4, C4)
+C4 <- rep("orange", nrow(G3.4))
+Grupo3.4 <- cbind(G3.4, C4)
+C4 <- rep("darkorange", nrow(G4.4))
+Grupo4.4 <- cbind(G4.4, C4)
+C4 <- rep("red", nrow(G5.4))
+Grupo5.4 <- cbind(G5.4, C4)
+C4 <- rep("orangered", nrow(G6.4))
+Grupo6.4 <- cbind(G6.4, C4)
+```
+
+## Demografía
+
+```{r}
+C5 <- rep("orange", nrow(G1.5))
+Grupo1.5 <- cbind(G1.5, C5)
+C5 <- rep("green", nrow(G2.5))
+Grupo2.5 <- cbind(G2.5, C5)
+C5 <- rep("orangered", nrow(G3.5))
+Grupo3.5 <- cbind(G3.5, C5)
+C5 <- rep("greenyellow", nrow(G4.5))
+Grupo4.5 <- cbind(G4.5, C5)
+C5 <- rep("red", nrow(G5.5))
+Grupo5.5 <- cbind(G5.5, C5)
+```
+
+# Ordenando los barrios {.tabset}
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+unzip("C:/Users/User/Dropbox/Estadística UN/8 Semestre/TAE/Trabajos/1er. Trabajo/Barrios de Medellín.zip")
+barrios_med <- readOGR(dsn = "C:/Users/JESSICA/Desktop/TAE/TRABAJO FINAL/medellin", layer = "Barrio_Vereda" )
+```
+
+Se organizan la base de datos de que contiene las proporciones por cada nivel de las preguntas para cada barrio, con el objetivo de obtener un marco de datos donde las filas sean los barrios y las columnas corresponden las proporciones mencionadas, observe:
+
+```{r include=FALSE}
+barrios <- (g1$Barrios)
+barrios <- as.character(barrios)
+barrios[[69]] <- "Sin Nombre"
+barrios[[214]] <- "NUEVA VILLA DEL ABURRÁ"
+barrios[[8]] <- "ALTAVISTA SECTOR CENTRAL"
+barrios[[293]] <- "VILLATINA"
+barrios[[101]] <- "EL SOCORRO"
+barrios[[13]] <- "AREA DE EXPANSION SAN CRISTOBAL"
+barrios[[16]] <- "AREA DE EXPANSION PAJARITO"
+barrios[[17]] <- "AREA DE EXPANSION SAN ANTONIO DE PRADO"
+barrios[[21]] <- "BARRIO CAICEDO"
+barrios[[28]] <- "BRASILIA"
+barrios[[35]] <- "BERMEJAL-LOS ALAMOS"
+barrios[[47]]<- "San Antonio de Prado"
+barrios[[49]] <- "CALASANZ"
+barrios[[50]] <- "CALASANZ PARTE ALTA"
+barrios[[87]] <- "EL NOGAL-LOS ALMENDROS"
+barrios[[190]] <- "LOS CERROS EL VERGEL"
+barrios[[200]] <- "MARIA CANO-CARAMBOLAS"
+barrios[[204]] <-"MIRAFLORES"
+barrios[[236]] <- "PROGRESO NO.2"
+barrios[[269]] <- "SANTO DOMINGO SAVIO NO.1"
+barrios[[270]] <- "SANTO DOMINGO SAVIO NO.2"
+barrios[[84]] <- "EL DIAMANTE NO.2"
+barrios[[19]] <- "AURES NO.1"
+barrios[[20]] <- "AURES NO.2"
+barrios[[140]] <- "LA ESPERANZA NO.2"
+barrios[[197]] <- "MANRIQUE CENTRAL NO.1"
+barrios[[198]] <- "MANRIQUE CENTRAL NO.2"
+barrios[[174]] <- "LAS LOMAS NO.1"
+barrios[[175]] <- "LAS LOMAS NO.2"
+barrios[[39]] <- "BOMBONÁ NO.1"
+barrios[[40]] <- "BOMBONÁ NO.2"
+barrios[[283]] <- "VERSALLES NO.1"
+barrios[[284]] <- "VERSALLES NO.2"
+barrios[[53]] <- "CAMPO VALDÉS NO.1"
+barrios[[54]] <- "CAMPO VALDÉS NO.2"
+barrios[[245]] <- "SAN JAVIER NO.1"
+barrios[[246]] <- "SAN JAVIER NO.2"
+barrios[[251]] <- "SAN JOSÉ LA CIMA NO.1"
+barrios[[252]] <- "SAN JOSÉ LA CIMA NO.2"
+barrios[[211]] <- "MOSCÚ NO.1"
+barrios[[212]] <- "MOSCÚ NO.2"
+barrios[[130]] <- "ASOMADERA NO.1"
+barrios[[131]] <- "ASOMADERA NO.2"
+barrios[[132]] <- "ASOMADERA NO.3"
+barrios[[188]] <- "LOS BALSOS NO.1"
+barrios[[189]] <- "LOS BALSOS NO.2"
+```
+
+```{r}
+barrios <- tolower(barrios)
+barrios <- unlist(lapply(barrios, FUN=toTitleCase))
+```
+
+```{r include=FALSE}
+barrios[[125]] <- "Juan XXIII La Quiebra"
+barrios[[124]] <- "Juan Pablo II"
+barrios[[2]] <- "Aldea Pablo VI"
+barrios[[219]] <- "Pablo VI"
+barrios[[61]] <- "B. Cerro El Volador"
+barrios[[230]] <- "Piedras Blancas - Matasano"
+barrios[[48]] <- "Cabecera Urbana Corregimiento San Cristóbal"
+barrios[[25]] <- "Facultad de Minas"
+barrios[[56]] <- "Carlos E. Restrepo"
+barrios[[94]] <- "Playón de Los Comuneros"
+barrios[[106]] <- "Yolombo"
+barrios[[182]] <- "López de  Mesa"
+barrios[[65]] <- "Palmitas Sector Central"
+barrios[[290]] <- "Villa Lilliam"
+barrios[[9]] <- "Altos del Poblado"
+barrios[[10]] <- "Andalucía"
+barrios[[13]] <-  "Área de Expansión San Cristóbal"
+barrios[[14]] <- "Área de Expansión Altavista"
+barrios[[15]] <- "Área de Expansión Belén Rincón"
+barrios[[16]] <- "Área de Expansión Pajarito"
+barrios[[17]] <- "Área de Expansión San Antonio de Prado"
+barrios[[23]] <- "Barrio Colón"
+barrios[[26]] <- "Barrios de Jesús"
+barrios[[30]] <- "Belalcázar"
+barrios[[35]] <- "Bermejal-Los Álamos"
+barrios[[42]] <- "Bosques de San Pablo"
+barrios[[47]] <- "San Antonio de Prado"
+barrios[[71]] <- "Doce de Octubre No.1"
+barrios[[72]] <- "Doce de Octubre No.2"
+barrios[[63]] <- "Corazón de Jesús"
+barrios[[153]] <- "La Loma de Los Bernal"
+barrios[[200]] <- "María Cano-Carambolas"
+barrios[[205]] <- "Mirador del Doce"
+barrios[[214]] <- "Nueva Villa del Aburrá"
+barrios[[215]] <- "Nueva Villa de La Iguaná"
+barrios[[217]] <- "Ocho de Marzo"
+barrios[[235]] <- "El Progreso"
+barrios[[249]] <- "San José de La Montaña"
+barrios[[250]] <- "San José del Manzanillo"
+barrios[[254]] <- "San Martín de Porres"
+barrios[[260]] <- "Santa Fé"
+barrios[[261]] <- "Santa Inés"
+barrios[[262]] <- "Santa Lucía"
+barrios[[264]] <- "Santa María de Los Ángeles"
+barrios[[266]] <- "Santa Rosa de Lima"
+barrios[[272]] <- "Simón Bolívar"
+barrios[[278]] <- "Trece de Noviembre"
+barrios[[281]] <- "Urquitá"
+barrios[[282]] <- "Veinte de Julio"
+barrios[[286]] <- "Villa del Socorro"
+```
+
+## Seguridad
+
+```{r}
+base_colors_yub <- rbind(Grupo1.1,Grupo2.1,Grupo3.1,Grupo4.1)
+base_colors_yub <- base_colors_yub[with(base_colors_yub, order(base_colors_yub$Barrios)),]
+base_colors_yub <- data.frame(barrios, base_colors_yub)
+base_colors_yub <- base_colors_yub[,-2]
+f <- data.frame(base_colors_yub$barrios, base_colors_yub$cluster, base_colors_yub$C)
+names(f) <- c("barrio","cluster","color")
+nombres_barrios <- iconv(barrios_med@data$NOMBRE,"UTF-8","ISO_8859-1")
+f2 <- as.data.frame(nombres_barrios)
+names(f2) <- c("barrio")
+final <- merge(f2, f, bY="barrio")
+faltantes <-  as.data.frame(setdiff(f2$barrio, final$barrio))
+clus <- rep(0,25)
+col <- rep("white",25)
+faltantes2 <- data.frame(faltantes, clus, col)
+names(faltantes2) <- c("barrio","cluster","color")
+final.def <- rbind(final,faltantes2)
+final.def <- data.frame(final.def, f2)
+```
+
+```{r}
+vec_colors1 <- data.frame()
+for (i in 1:nrow(final.def)){
+        for(j in 1:nrow(final.def)){
+                if(final.def[i,4]==final.def[j,1]){
+                        vec_colors1[i,1]<-final.def[j,3]
+}}}
+```
+
+## Transporte
+
+```{r}
+base_colors_val <- rbind(Grupo1.2,Grupo2.2,Grupo3.2,Grupo4.2,Grupo5.2,Grupo6.2,Grupo7.2)
+base_colors_val <- base_colors_val[with(base_colors_val, order(base_colors_val$Barrios)),]
+base_colors_val <- data.frame(barrios, base_colors_val)
+base_colors_val <- base_colors_val[,-2]
+f.val <- data.frame(base_colors_val$barrios, base_colors_val$cluster, base_colors_val$C2)
+names(f.val) <- c("barrio","cluster","color")
+final.val <- merge(f2, f.val, bY="barrio")
+faltantes.val <- as.data.frame(setdiff(f2$barrio, final.val$barrio))
+clus.val <- rep(0,25)
+col.val <- rep("white",25)
+faltantes2.val <- data.frame(faltantes.val, clus.val, col.val)
+names(faltantes2.val) <- c("barrio","cluster","color")
+final.def.val <- rbind(final.val, faltantes2.val)
+final.def.val <- data.frame(final.def.val, f2)
+```
+
+```{r}
+vec_colors2 <- data.frame()
+for (i in 1:nrow(final.def.val)){
+        for(j in 1:nrow(final.def.val)){
+                if(final.def.val[i,4]==final.def.val[j,1]){
+                        vec_colors2[i,1]<-final.def.val[j,3]
+}}}
+```
+
+## Educación
+
+```{r}
+base_colors_jess <- rbind(Grupo1.3,Grupo2.3,Grupo3.3,Grupo4.3,Grupo5.3,Grupo6.3)
+base_colors_jess <- base_colors_jess[with(base_colors_jess, order(base_colors_jess$Barrios)),]
+base_colors_jess <- data.frame(barrios, base_colors_jess)
+base_colors_jess <- base_colors_jess[,-2]
+f.jess <- data.frame(base_colors_jess$barrios, base_colors_jess$cluster, base_colors_jess$C3)
+names(f.jess) <- c("barrio","cluster","color")
+final.jess <- merge(f2, f.jess, bY="barrio")
+faltantes.jess <- as.data.frame(setdiff(f2$barrio, final.jess$barrio))
+clus.jess <- rep(0,25)
+col.jess <- rep("white",25)
+faltantes2.jess <- data.frame(faltantes.jess, clus.jess, col.jess)
+names(faltantes2.jess) <- c("barrio","cluster","color")
+final.def.jess <- rbind(final.jess, faltantes2.jess)
+final.def.jess <- data.frame(final.def.jess, f2)
+```
+
+```{r}
+vec_colors3 <- data.frame()
+for (i in 1:nrow(final.def.jess)){
+        for(j in 1:nrow(final.def.jess)){
+                if(final.def.jess[i,4]==final.def.jess[j,1]){
+                        vec_colors3[i,1]<-final.def.jess[j,3]
+}}}
+```
+
+## Salud
+
+```{r}
+base_colors_salud <- rbind(Grupo1.4,Grupo2.4,Grupo3.4,Grupo4.4,Grupo5.4,Grupo6.4)
+base_colors_salud <- base_colors_salud[with(base_colors_salud, order(base_colors_salud$levels.Salud.Barrio.)),]
+base_colors_salud <- data.frame(barrios, base_colors_salud)
+base_colors_salud <- base_colors_salud[,-2]
+f.salud <- data.frame(base_colors_salud$barrios, base_colors_salud$cluster, base_colors_salud$C4)
+names(f.salud) <- c("barrio","cluster","color")
+final.salud <- merge(f2, f.salud, bY="barrio")
+faltantes.salud <- as.data.frame(setdiff(f2$barrio, final.salud$barrio))
+clus.salud <- rep(0,25)
+col.salud <- rep("white",25)
+faltantes2.salud <- data.frame(faltantes.salud, clus.salud, col.salud)
+names(faltantes2.salud) <- c("barrio","cluster","color")
+final.def.salud <- rbind(final.salud, faltantes2.salud)
+final.def.salud <- data.frame(final.def.salud, f2)
+```
+
+```{r}
+vec_colors4 <- data.frame()
+for (i in 1:nrow(final.def.salud)){
+        for(j in 1:nrow(final.def.salud)){
+                if(final.def.salud[i,4]==final.def.salud[j,1]){
+                        vec_colors4[i,1]<-final.def.salud[j,3]}}}
+```
+
+
+## Demografía
+
+```{r}
+base_colors_dem <- rbind(Grupo1.5,Grupo2.5,Grupo3.5,Grupo4.5,Grupo5.5)
+base_colors_dem <- base_colors_dem[with(base_colors_dem, order(base_colors_dem$Barrios)),]
+base_colors_dem <- data.frame(barrios, base_colors_dem)
+base_colors_dem <- base_colors_dem[,-2]
+f.dem <- data.frame(base_colors_dem$barrios, base_colors_dem$cluster, base_colors_dem$C5)
+names(f.dem) <- c("barrio","cluster","color")
+final.dem <- merge(f2, f.dem, bY="barrio")
+faltantes.dem <-  as.data.frame(setdiff(f2$barrio, final.dem$barrio))
+clus.dem <- rep(0,25)
+col.dem <- rep("white",25)
+faltantes2.dem <- data.frame(faltantes.dem, clus.dem, col.dem)
+names(faltantes2.dem) <- c("barrio","cluster","color")
+final.def.dem <- rbind(final.dem, faltantes2.dem)
+final.def.dem <- data.frame(final.def.dem, f2)
+```
+
+```{r}
+vec_colors5 <- data.frame()
+for (i in 1:nrow(final.def.dem)){
+        for(j in 1:nrow(final.def.dem)){
+                if(final.def.dem[i,4]==final.def.dem[j,1]){
+                        vec_colors5[i,1]<-final.def.dem[j,3]
+}}}
+```
+
+# Mapas de calor {.tabset}
+
+## Seguridad
+
+```{r}
+m1=leaflet(barrios_med)
+m1=addTiles(m1)
+vec_colors1 <- as.factor(vec_colors1$V1)
+m1=addPolygons(m1, popup=nombres_barrios, color=vec_colors1, fillOpacity=1, opacity=20)
+m1
+```
+
+## Transporte
+
+```{r}
+m2=leaflet(barrios_med)
+m2=addTiles(m2)
+vec_colors2 <- as.factor(vec_colors2$V1)
+m2=addPolygons(m2, popup=nombres_barrios, color=vec_colors2, fillOpacity=1, opacity=20)
+m2
+```
+
+
+## Educación
+
+```{r}
+m3=leaflet(barrios_med)
+m3=addTiles(m3)
+vec_colors3 <- as.factor(vec_colors3$V1)
+m3=addPolygons(m3, popup=nombres_barrios, color=vec_colors3, fillOpacity=1, opacity=20)
+m3
+```
+
+## Salud
+
+```{r}
+m4=leaflet(barrios_med)
+m4=addTiles(m4)
+vec_colors4 <- as.factor(vec_colors4$V1)
+m4=addPolygons(m4, popup=nombres_barrios, color=vec_colors4, fillOpacity=1, opacity=20)
+m4
+```
+
+## Demografía
+
+```{r}
+m5=leaflet(barrios_med)
+m5=addTiles(m5)
+vec_colors5 <- as.factor(vec_colors5$V1)
+m5=addPolygons(m5, popup=nombres_barrios, color=vec_colors5, fillOpacity=1, opacity=20)
+m5
+```
+
+# Conclusiones {.tabset}
+
++ Las siguientes conclusiones se pueden observar en el mapa, donde los zonas con peor calidad de cada dimension aparecen en color rojo, las zonas aceptables de colores naranjas y las zonas con mejor calidad color verde.
+
+## Seguridad
+
+1. Según el gráfico de calor para la dimensión seguridad, se evidencia que los barrios, veredas o corregimientos del suroccidente de la ciudad cuentan con mejores niveles de seguridad. Es decir, las personas que viven en los barrios localizados en el suroccidente de la ciudad se sienten seguros en el lugar donde viven. Además, se observa que, generalmente los barrios localizados en el noroccidente y centro de la ciudad, se presentan los índices de inseguridad más elevados de la ciudad; es decir, los habitantes de los barrios localizados en las zonas mencionadas, se sienten más expuestos a ser víctimas de algún problema de seguridad.
+
+## Transporte
+
+1.Para los barrios pertenecientes al grupo1 y al grupo 6 según la percepción de sus habitantes la calidad del transporte, calidad de zonas, cobertura etc son buenas e invierten en medios de transporte aproximadamente entre 50.000 y 200.000.
+
+2.Para los barrios pertenecientes al grupo2 según la percepción de sus habitantes la calidad del transporte, calidad de zonas, cobertura etc son muy malas o malas e invierten en medios de transporte aproximadamente entre 0 y 50.000, con esto podemos concluir que los servicios de transporte en general son malos para estos barrios.
+
+3.Para los barrios pertenecientes al grupo3 y al grupo 5 según la percepción de sus habitantes la calidad del transporte, calidad de zonas, cobertura, etc son aceptables o buenas e invierten en medios de transporte aproximadamente entre 30.000 y 250.000.
+
+4.Para los barrios pertenecientes al grupo4 según la percepción de sus habitantes la calidad del transporte, calidad de zonas, cobertura etc son buenas o muy buenas e invierten en medios de transporte aproximadamente entre 60.000 y 180.000.
+
+En conclusión, la percepción de los habitantes de cada barrio va muy ligada al monto que invierten en medio de transporte dado que para las personas que menos invierten el transporte es peor, por el contrario, para las personas que invierten un monto razonable o alto, el transporte es bueno o muy bueno.
+Finalmente, los barrios el Carmelo y la ilusión tienen medios de transporte muy malos, por otro lado, para los barrios suramericana, belén, bombona, entre otros pertenecientes al grupo 4 el transporte es muy bueno y para el resto de barrios el transporte es aceptable.
+
+
+
+## Educación
+Para las siguientes conclusiones tengamos en cuenta que el color de 
+cada barrio es dado según el grupo en el que quedo clasificado. 
+
+1. Después de un análisis realizado se puede ver que para los barrios
+pertenecientes en el grupo 4 que son: Guayaquil, La Frisola y San José
+son barrios de Medellín donde una gran proporcion de sus habitantes no  son
+analfabetas siendo estos también barrios donde el mayor grado de estudio
+encontrado fue media academica, además más del 50% de los habitantes
+de estos barrios piensas que el nivel de educación en esas zonas en vez 
+de mejorar cada vez empeora. 
+ 
+ 
+ 2. El análisis realizado para el grupo 2 que incluye los barrios: Alejandría,Astorga, El Castillo, El Poblado, La Aguacatala, Lalinde, Las Lomas número 1 y 2,los Naranjos, Santa Maria de Los Ángeles, Villa Carlota, Altos del Poblado,Castropol, El Diamante número 2, El Tesoro, La Florida, Las balsos número 1 y 2,Los Conquistadores, San Lucas Y Suramericana, pudimos notar que estos barrios menos del 1% de los encuestados son analfabetas, la mayoria de sus habitantes han realizados estudios en insitituciones privadas y alcanzaron niveles de técnicos y universitarios,a su vez mas del 50% de los encuestados piensan que el nivel de educación en estos sectores ha mejorado o ha mantenido un nivel estable. 
+ 
+ 
+ 3. Para el grupo 1: se encontró que estos al menos el 33% de sus habitantes son analfabetas,en estos barrios la mayoria de sus habitantes han alcanzado como mayor nivel de educación la media academica y han estudiado en su mayoria en instituciones públicas y piensan que el nivel educativo ha mejorado o se ha mantenido igual. 
+ 
+4. Para el grupo 3,5 y 6  se encontraron resultados muysimilares como: bajos niveles de analfabetismo entre los habitantes de dichos barrios,han estudiado en instituciones públicas y en general dicen que el nivel de eduación es bueno y ha mejorado o permanecido igual.
+ 
+ 5. Como conclusión general se puede decir que en la ciudad de Medellín,en cuanto a la educación la mayoria de los habitantes consideran que esta tiene un nivel aceptable y que mejora o permanece constante con el tiempo,habiendo tres barrios, en este caso los del grupo 4 que son barrios donde la educación se considera mala y que en vez de mejorar su calidad, esta desmejora,cabe resaltar que a diferencia de los otros grupos donde se dan bajos niveles de analfabetismo estos de lo contrario, mostraron niveles muy altos. 
+
+
+## Salud
+
+1. Se puede decir que en cuanto a percepción sobre la salud en la ciudad de Medellín las personas que viven cercanas a hospitales consideras que el acceso a la salud es por lo general bueno, por otro lado, es interesante ver que en barrios donde se espera que haya mayor cantidad de personas cubiertas por los servicios médicos o de salud tienen una percepción regular sobre el acceso a esta, esto puede deberse a que asocian la salud no desde la individualidad si no desde el sistema.
+
+2.Se puede observar que por lo general en los barrios de ladera hacia el occidente y hacia el nororiente las personas consideran que no hay un muy buen acceso a los servicios de salud ya sea porque no tienen una afiliación al sistema de seguridad social, ya sea subsidiado o no.
+
+3.Hay veredas en las cuales las personas consideran que pueden acceder fácilmente a los servicios de salud, esto puede deberse a la presencia de intermedias hospitalarias exclusivas de poca afluencia.
+
+
+## Demografía
+
+1. En el mapa de puede observar que los barrios ubicados hacia el sur oriente y centro occidente de la ciudad a nivel de las variables escogidas representan los mejores indicadores con respecto a estas, es decir, si una personas nace en el sur es poco probable que muera despues de nacer, viva hacinado o incluso sea victima de abuso sexual. 
+
+2. Se puede observar que en Medellin los barrios de ladera, representan lo peor en cuanto a posibilidades de superarse al nacer se refieren, es decir, son barrios, en los cuales la probabilidad de morir despues de nacer son mas altas, las personas viven por lo general hacinados. 
+
+3. Hay algunas veredas que a nivel demografico presentan buenos indicadores lo que lleva a pensar que el estilo de vida que viven allí beneficia un poco la calidad de vida de las personas. 
+
+
+
+# Propuestas para la continuación del trabajo 
+
+Teniendo en cuenta que con el trabajo anterior pudimos ver que barrios eran mejor que otros en aspectos como salud, educación, demografía, transporte y seguridad y como estaba distribuido a nivel geográfico los “mejores” y “peores” barrios. Una propuesta interesante sería la construcción de un modelo de asignación de estratos, podría ser un modelo de clasificación, basado en esos indicadores de calidad de vida. 
+
+
+# Conclusiones finales
+
+En general se puede decir que en Medellín el desarrollo no está enfocado en un solo punto, pero aún así hay dos grandes puntos de concentración en la ciudad donde se  ubican los mejores indicadores de las variables y son hacia el sur oriente y hacia el centro occidente. Aún así hay dimensiones que se distribuyen muy igual en toda la geografía como lo es la seguridad, en la cual, la percepción de las personas con respecto a esta dimensión es en general mala. Por otro lado en educación, las personas consideran que la ciudad va por buen camino en cuanto a esta dimensión se hable y la califican positivamente. 
+
+
+# Referencias
+
+1.	Encuesta calidad de vida: http://medata.gov.co/dataset/encuesta-calidad-de-vida
+
+2.	Mapa de barrio vereda: https://geomedellin-m-medellin.opendata.arcgis.com/datasets/c844f0fd764f41b2a808d8747457de8a_4
+
+3.	Citando R:  R Core Team (2019). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+4.	Ospina A. (2019). Breve introducción al análisis espacial en R. 
+
+5.	FERNÁNDEZ, R. Plataformas de sustentabilidad: soportes urbano-territoriales, problemáticas y gestión ambiental. En: BRAND, P. La ciudad latinoamericana en el Siglo XXI: Globalización, Neoliberalismo, Planeación. Medellín: Brand, Peter/Universidad Nacional de Colombia, 2009. Parte 2.2, p.149-172.
