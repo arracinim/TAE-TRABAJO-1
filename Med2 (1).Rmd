@@ -1396,9 +1396,9 @@ En general se puede decir que en Medellín el desarrollo no está enfocado en un
 
 1.	Encuesta calidad de vida: http://medata.gov.co/dataset/encuesta-calidad-de-vida
 
-2.	Mapa de barrio vereda: https://geomedellin-m-medellin.opendata.arcgis.com/datasets/c844f0fd764f41b2a808d8747457de8a_4
+2.	Mapa de barrio de Medellin: https://geomedellin-m-medellin.opendata.arcgis.com/datasets/c844f0fd764f41b2a808d8747457de8a_4
 
-3.	Citando R:  R Core Team (2019). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+3.  R Core Team (2019). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
 
 4.	Ospina A. (2019). Breve introducción al análisis espacial en R. 
 
